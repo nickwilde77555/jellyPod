@@ -35,6 +35,7 @@ String desiredId = "";
 JSONArray songs;
 int songIndex = 0;
 int currentIndex = 0;
+int lastIndex = 0;
 
 PGraphics pg;
 float percentage;
@@ -50,6 +51,8 @@ String currentId;
 PImage albumArt;
 boolean shuffle = false;
 boolean shuffleChanged = false;
+
+android.net.wifi.WifiManager.WifiLock wifiLock;
 
 void sortSongs(JSONArray array, final String field) {
   // 1. Convert JSONArray to a Sortable List
@@ -263,6 +266,8 @@ void setup() {
   orientation(PORTRAIT);
   requestNotificationPermission();
   startForegroundService();
+  android.net.wifi.WifiManager wm = (android.net.wifi.WifiManager) getActivity().getSystemService(Context.WIFI_SERVICE);
+  wifiLock = wm.createWifiLock(android.net.wifi.WifiManager.WIFI_MODE_FULL_HIGH_PERF, "jellyPodLock");
 
   pg = createGraphics(floor(width*0.8), floor(width*0.8), P2D);
 
@@ -386,7 +391,15 @@ void draw() {
       if (posit.length() < 2) {
         posit = "0" + posit;
       }
-      pg.text(minutesPosition + ":" + posit, pg.width * 0.75, pg.height * 0.9125);
+      pg.text(minutesPosition + ":" + posit, pg.width * 0.75, pg.height * 0.90);
+      secondsPosition = maxDuration / 1000;
+      minutesPosition = floor(secondsPosition / 60);
+      secondsPosition = int(secondsPosition % 60);
+      posit = "" + int(secondsPosition);
+      if (posit.length() < 2) {
+        posit = "0" + posit;
+      }
+      pg.text(minutesPosition + ":" + posit, pg.width * 0.75, pg.height * 0.95);
     }
   } else if (percentage > 0) {
     pg.fill(255);
@@ -416,7 +429,11 @@ void draw() {
           print(lastAngle);
         }
         if (abs(lastAngle + HALF_PI) < QUARTER_PI && heldFrames < 99990) {
-          screen = 0;
+          if (screen == 1) {
+            screen = 0;
+          } else if (screen == 0) {
+            screen = 1;
+          }
         }
         else if (abs(lastAngle - HALF_PI) < QUARTER_PI && heldFrames < 99990) {
           if (mp != null && mp.isPlaying()) {
@@ -427,15 +444,23 @@ void draw() {
         }
         
         else if (abs(lastAngle) < QUARTER_PI && heldFrames < 99990) {
-          currentIndex++;
-          songIndex = currentIndex;
+          if (!shuffle) {
+            currentIndex++;
+            println(" notshuffled");
+          } else {
+            println("shuffle");
+            lastIndex = currentIndex;
+            currentIndex = int(random(songs.size()));
+          }
           playSong();
           println("UNEXPECTED BITCH 1");
         } else if (abs(lastAngle) > 3 * QUARTER_PI && heldFrames < 99990 && d <= (width*0.5)/2) {
-          println(d, (width*0.2)/2);
           //this shit keeps misfiring so hard im debating fucking removing it.
-          currentIndex--;
-          songIndex = currentIndex;
+          if (!shuffle) {
+            currentIndex--;
+          } else {
+            currentIndex = lastIndex;
+          }
           playSong();
           println("POSSIBLY EXPECTED BITCH WTF");
         }
@@ -567,7 +592,7 @@ void mousePress() {
     alreadyPressed = true;
   }
   
-  if (d <= innerRadius && heldFrames > frameRate &! shuffleChanged) {
+  if (d <= innerRadius && heldFrames > frameRate &! shuffleChanged && screen == 1) {
     beenPressed = false;
     shuffle = !shuffle;
     shuffleChanged = true;
@@ -575,6 +600,7 @@ void mousePress() {
 }
 
 void playSong() {
+  if (!wifiLock.isHeld()) wifiLock.acquire();
   songIndex = currentIndex;
   JSONObject item = songs.getJSONObject(currentIndex);
   String id = item.getString("Id");
@@ -598,18 +624,22 @@ void playSong() {
 
     mp.setOnCompletionListener(new MediaPlayer.OnCompletionListener() {
       public void onCompletion(MediaPlayer player) {
+        println("Song completed");
         if (!shuffle) {
           currentIndex++;
         } else {
+          lastIndex = currentIndex;
           currentIndex = int(random(songs.size()));        
         }
         if (currentIndex >= songs.size()) {
           currentIndex = 0;
         }
-        JSONObject nextSong = songs.getJSONObject(songIndex);
+        JSONObject nextSong = songs.getJSONObject(currentIndex);
         String nextId = nextSong.getString("Id");
         currentId = nextId;
+        println("Playing next song...");
         playSong();
+        println("Next song played");
       }
     }
     );
@@ -622,13 +652,16 @@ void playSong() {
 }
 
 void loadPicture() {
+  println("loading new picture");
   currentId = songs.getJSONObject(songIndex).getString("Id");
   String albumURL = serverUrl + "/Items/" + currentId + "/Images/Primary?fillHeight=300&fillWidth=300&quality=90";
   albumArt = loadImage(albumURL);
   JSONObject item = songs.getJSONObject(currentIndex);
   String name = item.getString("Name");
   String artist = item.isNull("AlbumArtist") ? "Unknown Artist" : item.getString("AlbumArtist");
-  updateNotification(name, artist, albumArt); // Update text immediately
+  println("updating notification");
+  updateNotification(name, artist, albumArt);
+  println("picture loaded successfully");
 }
 
 void drawWheel() {
