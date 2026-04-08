@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="1" android:versionName="1.0" package="com.nickwilde7755.jellypod">
+<manifest xmlns:android="http://schemas.android.com/apk/res/android" android:versionCode="1" android:versionName="1.1" package="com.nickwilde7755.jellypod">
     <application android:icon="@mipmap/ic_launcher" android:label="JellyPod" android:usesCleartextTraffic="true">
         <activity android:exported="true" android:launchMode="singleTask" android:name=".MainActivity" android:theme="@style/Theme.AppCompat.Light.NoActionBar.FullScreen">
             <intent-filter>
