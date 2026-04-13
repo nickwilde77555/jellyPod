@@ -6,6 +6,18 @@ An iPod style music player for Jellyfin, made in Processing 4. Only for android.
 
 Download the app from releases, install it (play protect will warn you about it being an older app, it isn't it just isnt compiled for the most recent version, and it uses a self signed certificate). Upon launching, allow notifications (the app has a persistent notification that shows the song info, which I believe helps it not die in the background. Then, input your jellyfin server information, and play some music!
 
+## SAMSUNG USERS
+
+Make sure you set the app's battery restrictions to unrestricted, or background playback wont work.
+
+## Controls
+
+ - Center button: Confirm. Hold on the now playing screen to enable shuffle. Hold on any other screen to go to Artist view.
+ - Top of clickwheel: go up one screen (going up on the Artist view will go to an all track view
+ - Right side of clickwheel: Skip
+ - Left side of clickwheel: Go to previous song (in shuffle, history is saved one song when skipping manually, in case you shuffle over a song you'd like to listen to
+ - Bottom of clickwheel: Play/pause (works anywhere)
+
 ## Features
 
 The app currently can:
@@ -27,8 +39,8 @@ If the app remains black when starting, it means the app couldn't connect to the
 
 ## Features I want to implement
 
- - Artist, album, and playlist views, instead of only tracks
- - Some kind of queue system.
+ - ~~Artist, album~~, and playlist views, instead of only tracks
+ - Some kind of queue system. (If you hover over a song while another one is playing, it will go to that song upon ending, which should tide you over until I implement a proper queue)
 
 ## A.I. Disclosure
 
