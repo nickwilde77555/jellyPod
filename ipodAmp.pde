@@ -23,10 +23,10 @@ import android.content.pm.PackageManager;
 
 
 // --- CONFIG ---
-String serverUrl = ""; 
-  String username =  "";
-  String password =  "";
-  String token = "";
+String serverUrl = "";
+String username =  "";
+String password =  "";
+String token = "";
 String[] info;
 
 MediaPlayer mp;
@@ -36,17 +36,22 @@ JSONArray songs;
 int songIndex = 0;
 int currentIndex = 0;
 int lastIndex = 0;
+String artist = "";
+String currentName;
 
 PGraphics pg;
 float percentage;
 float d;
 float lastAngle = 9001;
+float innerRadius;
 float wheelAccumulator = 0;
 boolean alreadyPressed = false;
 boolean beenPressed = false;
 int heldFrames = 0;
 //0 = song list, 1 = now playing
 int screen = 0;
+//0 = Tracks, 1 = Artists, 2 = Albums
+int searchMode = 1;
 String currentId;
 PImage albumArt;
 boolean shuffle = false;
@@ -105,13 +110,15 @@ void openTextInputIp() {
         .setTitle("Step 1: Server IP")
         .setView(input)
         .setPositiveButton("Next", new DialogInterface.OnClickListener() {
-          public void onClick(DialogInterface dialog, int whichButton) {
-            setIp(input.getText().toString());
-            openTextInputUname(); // Trigger next
-          }
-        }).show();
+        public void onClick(DialogInterface dialog, int whichButton) {
+          setIp(input.getText().toString());
+          openTextInputUname(); // Trigger next
+        }
+      }
+      ).show();
     }
-  });
+  }
+  );
 }
 
 void openTextInputUname() {
@@ -122,13 +129,15 @@ void openTextInputUname() {
         .setTitle("Step 2: Username")
         .setView(input)
         .setPositiveButton("Next", new DialogInterface.OnClickListener() {
-          public void onClick(DialogInterface dialog, int whichButton) {
-            username = input.getText().toString();
-            openTextInputPass(); // Trigger next
-          }
-        }).show();
+        public void onClick(DialogInterface dialog, int whichButton) {
+          username = input.getText().toString();
+          openTextInputPass(); // Trigger next
+        }
+      }
+      ).show();
     }
-  });
+  }
+  );
 }
 
 void openTextInputPass() {
@@ -140,16 +149,18 @@ void openTextInputPass() {
         .setTitle("Step 3: Password")
         .setView(input)
         .setPositiveButton("Finish", new DialogInterface.OnClickListener() {
-          public void onClick(DialogInterface dialog, int whichButton) {
-            password = input.getText().toString();
-            // Save and Start
-            String[] toSave = {serverUrl, username, password};
-            saveStrings("server.txt", toSave);
-            thread("initializeJellyfin");
-          }
-        }).show();
+        public void onClick(DialogInterface dialog, int whichButton) {
+          password = input.getText().toString();
+          // Save and Start
+          String[] toSave = {serverUrl, username, password};
+          saveStrings("server.txt", toSave);
+          thread("initializeJellyfin");
+        }
+      }
+      ).show();
     }
-  });
+  }
+  );
 }
 
 
@@ -175,7 +186,8 @@ void updateNotification(String title, String artist, PImage art) {
     try {
       Bitmap albumBitmap = (Bitmap) art.getNative();
       builder.setLargeIcon(albumBitmap);
-    } catch (Exception e) {
+    }
+    catch (Exception e) {
       // Fallback if bitmap conversion fails
     }
   }
@@ -192,9 +204,9 @@ void startForegroundService() {
   // 1. Setup the Notification Channel (Required for Android 8.0+)
   if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.O) {
     NotificationChannel channel = new NotificationChannel(
-      channelId, "Music Playback", 
+      channelId, "Music Playback",
       NotificationManager.IMPORTANCE_LOW
-    );
+      );
     NotificationManager manager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
     manager.createNotificationChannel(channel);
   }
@@ -217,7 +229,7 @@ void startForegroundService() {
 
   // 4. Start the service
   getActivity().startForegroundService(new android.content.Intent(context, getActivity().getClass()));
-  
+
   NotificationManager mNotificationManager = (NotificationManager) context.getSystemService(Context.NOTIFICATION_SERVICE);
   mNotificationManager.notify(1, notification);
 }
@@ -226,9 +238,9 @@ void startForegroundService() {
 void requestNotificationPermission() {
   // Check if we are on Android 13 (API 33) or higher
   if (android.os.Build.VERSION.SDK_INT >= 33) {
-    if (getActivity().checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS) 
-        != PackageManager.PERMISSION_GRANTED) {
-      
+    if (getActivity().checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
+      != PackageManager.PERMISSION_GRANTED) {
+
       // Request the permission using the standard Activity method
       getActivity().requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 101);
     }
@@ -238,7 +250,7 @@ void requestNotificationPermission() {
 
 void settings() {
   if (int(displayWidth*(16.0/9)) < displayHeight) {
-  size(displayWidth, int(displayWidth*(16.0/9)), P2D);
+    size(displayWidth, int(displayWidth*(16.0/9)), P2D);
   } else {
     size(int(displayWidth*(9.0/16)), displayHeight, P2D);
     print("the size is wack");
@@ -280,9 +292,9 @@ void draw() {
   fill(255);
   //textSize(40);
   // 904 is the magic pixel width for the Fold5 Cover Screen
-  float fold5Width = 904.0; 
+  float fold5Width = 904.0;
   float dynamicFontSize = 40.0 * (width / fold5Width);
-  
+
   // Apply to main canvas
   textSize(dynamicFontSize);
   //text("Jellyfin MVP", 50, 80);
@@ -295,7 +307,7 @@ void draw() {
    text("Tap to Stream", 50, 320);
    }
    */
-   //text(alreadyPressed? "TRUE" : "FALSE" + heldFrames, 50, 50);
+  //text(alreadyPressed? "TRUE" : "FALSE" + heldFrames, 50, 50);
   if (!token.equals("") && songs != null) {
     rect(width*0.1, height*0.1, width*0.8, width*0.8);
     if (screen == 0) {
@@ -363,57 +375,58 @@ void draw() {
       }
       pg.text(artist, pg.width * 0.5, pg.height * 0.75);
       pg.textAlign(LEFT);
-      
+
       if (shuffle) {
         pg.text("S", pg.width*0.1, pg.height*0.9125);
       }
-      
+
       try {
-  // 1. Double check mp exists AND is actually playing/active
-  if (mp != null && mp.isPlaying()) { 
-    int maxDuration = mp.getDuration();
-    int currentPosition = mp.getCurrentPosition();
-    
-    // 2. Prevent division by zero if the song just started
-    if (maxDuration > 0) {
-      percentage = currentPosition / (float)maxDuration;
-      
-      pg.fill(255);
-      pg.rect(pg.width * 0.15, pg.height * 0.85, pg.width * 0.55, pg.height * 0.1);
-      
-      pg.fill(50, 50, 200);
-      pg.rect(pg.width * 0.15, pg.height * 0.85, (pg.width * 0.55) * percentage, pg.height * 0.1);
-      pg.fill(0);
-      float secondsPosition = currentPosition / 1000;
-      int minutesPosition = floor(secondsPosition / 60);
-      secondsPosition = int(secondsPosition % 60);
-      String posit = "" + int(secondsPosition);
-      if (posit.length() < 2) {
-        posit = "0" + posit;
+        // 1. Double check mp exists AND is actually playing/active
+        if (mp != null && mp.isPlaying()) {
+          int maxDuration = mp.getDuration();
+          int currentPosition = mp.getCurrentPosition();
+
+          // 2. Prevent division by zero if the song just started
+          if (maxDuration > 0) {
+            percentage = currentPosition / (float)maxDuration;
+
+            pg.fill(255);
+            pg.rect(pg.width * 0.15, pg.height * 0.85, pg.width * 0.55, pg.height * 0.1);
+
+            pg.fill(50, 50, 200);
+            pg.rect(pg.width * 0.15, pg.height * 0.85, (pg.width * 0.55) * percentage, pg.height * 0.1);
+            pg.fill(0);
+            float secondsPosition = currentPosition / 1000;
+            int minutesPosition = floor(secondsPosition / 60);
+            secondsPosition = int(secondsPosition % 60);
+            String posit = "" + int(secondsPosition);
+            if (posit.length() < 2) {
+              posit = "0" + posit;
+            }
+            pg.text(minutesPosition + ":" + posit, pg.width * 0.75, pg.height * 0.90);
+            secondsPosition = maxDuration / 1000;
+            minutesPosition = floor(secondsPosition / 60);
+            secondsPosition = int(secondsPosition % 60);
+            posit = "" + int(secondsPosition);
+            if (posit.length() < 2) {
+              posit = "0" + posit;
+            }
+            pg.text(minutesPosition + ":" + posit, pg.width * 0.75, pg.height * 0.95);
+          }
+        } else if (percentage > 0) {
+          pg.fill(255);
+          pg.rect(pg.width * 0.15, pg.height * 0.85, pg.width * 0.55, pg.height * 0.1);
+
+          pg.fill(50, 50, 200);
+          pg.rect(pg.width * 0.15, pg.height * 0.85, (pg.width * 0.55) * percentage, pg.height * 0.1);
+          pg.text("PAUSE", pg.width * 0.75, pg.height * 0.925);
+        }
       }
-      pg.text(minutesPosition + ":" + posit, pg.width * 0.75, pg.height * 0.90);
-      secondsPosition = maxDuration / 1000;
-      minutesPosition = floor(secondsPosition / 60);
-      secondsPosition = int(secondsPosition % 60);
-      posit = "" + int(secondsPosition);
-      if (posit.length() < 2) {
-        posit = "0" + posit;
+      catch (Exception e) {
+        // 3. Catch ALL exceptions (like IllegalStateException) so the draw loop keeps running
+        // println("Progress bar sync error: " + e.getMessage());
       }
-      pg.text(minutesPosition + ":" + posit, pg.width * 0.75, pg.height * 0.95);
-    }
-  } else if (percentage > 0) {
-    pg.fill(255);
-      pg.rect(pg.width * 0.15, pg.height * 0.85, pg.width * 0.55, pg.height * 0.1);
-      
-      pg.fill(50, 50, 200);
-      pg.rect(pg.width * 0.15, pg.height * 0.85, (pg.width * 0.55) * percentage, pg.height * 0.1);
-      pg.text("PAUSE", pg.width * 0.75, pg.height * 0.925);
-  }
-} catch (Exception e) { 
-  // 3. Catch ALL exceptions (like IllegalStateException) so the draw loop keeps running
-  // println("Progress bar sync error: " + e.getMessage()); 
-}
-      
+
       pg.endDraw();
       image(pg, width*0.1, height*0.1, pg.width, pg.width);
     }
@@ -426,26 +439,63 @@ void draw() {
     } else if (heldFrames > 0) {
       if (beenPressed) {
         if (lastAngle < 9000) {
-          print(lastAngle);
         }
-        if (abs(lastAngle + HALF_PI) < QUARTER_PI && heldFrames < 99990) {
+        println(d <= innerRadius, ((mp == null) || (songs.getJSONObject(currentIndex).getString("Name").equals(currentName))), screen == 0, heldFrames < frameRate);
+        if (d <= innerRadius && ((mp == null) || (!songs.getJSONObject(currentIndex).getString("Name").equals(currentName))) && screen == 0 && heldFrames < frameRate) {
+          beenPressed = false;
+          print("step1");
+          if (searchMode == 0 || searchMode == 4) {
+            print("step2");
+            JSONObject item = songs.getJSONObject(currentIndex);
+            String id = item.getString("Id");
+            currentId = id;
+            thread("playSong");
+            screen = 1;
+          } else if (searchMode == 1) {
+            searchMode = 3;
+            artist = songs.getJSONObject(currentIndex).getString("Name");
+            fetchSongs();
+          } else if (searchMode == 3) {
+            searchMode = 4;
+            fetchSongs();
+          }
+          alreadyPressed = true;
+          //heldFrames+=99999;
+        } else if (d <= innerRadius && !alreadyPressed && screen == 0 && heldFrames > frameRate) {
+          searchMode = 1;
+          fetchSongs();
+          print("ugh");
+        }
+
+        if (d > innerRadius && abs(lastAngle + HALF_PI) < QUARTER_PI && heldFrames < 99990) {
           if (screen == 1) {
             screen = 0;
-          } else if (screen == 0) {
-            screen = 1;
+          } else {
+            searchMode--;
+            if (searchMode == 2) {
+              searchMode = 1;
+            }
+            print(searchMode);
+            if (searchMode < 0) {
+              searchMode = 0;
+            } else {
+              fetchSongs();
+            }
           }
-        }
-        else if (abs(lastAngle - HALF_PI) < QUARTER_PI && heldFrames < 99990) {
+        } else if (d > innerRadius && abs(lastAngle - HALF_PI) < QUARTER_PI && heldFrames < 99990) {
           if (mp != null && mp.isPlaying()) {
             mp.pause();
           } else if (mp != null && !mp.isPlaying()) {
             mp.start();
           }
-        }
-        
-        else if (abs(lastAngle) < QUARTER_PI && heldFrames < 99990) {
+        } else if (d > innerRadius && abs(lastAngle) < QUARTER_PI && heldFrames < 99990) {
           if (!shuffle) {
             currentIndex++;
+            if (currentIndex >= songs.size()) {
+              currentIndex = 0;
+              songIndex = currentIndex;
+              println("ran");
+            }
             println(" notshuffled");
           } else {
             println("shuffle");
@@ -454,10 +504,14 @@ void draw() {
           }
           playSong();
           println("UNEXPECTED BITCH 1");
-        } else if (abs(lastAngle) > 3 * QUARTER_PI && heldFrames < 99990 && d <= (width*0.5)/2) {
+        } else if (abs(lastAngle) > 3 * QUARTER_PI && heldFrames < 99990 && d >= innerRadius && d <= (width*0.5)/2) {
           //this shit keeps misfiring so hard im debating fucking removing it.
           if (!shuffle) {
             currentIndex--;
+            if (currentIndex < 0) {
+              currentIndex = songs.size()-1;
+              songIndex = currentIndex;
+            }
           } else {
             currentIndex = lastIndex;
           }
@@ -508,7 +562,24 @@ void authenticate() {
 void fetchSongs() {
   if (token.equals("")) return;
   try {
-    String songUrl = serverUrl + "/Items?Recursive=true&IncludeItemTypes=Audio&api_key=" + token;
+    String songUrl = "";
+    if (searchMode == 0) {
+      songUrl = serverUrl + "/Items?Recursive=true&IncludeItemTypes=Audio&api_key=" + token;
+    } else if (searchMode == 1) {
+      songUrl = serverUrl + "/Items?Recursive=true&IncludeItemTypes=MusicArtist&api_key=" + token;
+    } else if (searchMode == 2) {
+      songUrl = serverUrl + "/Items?Recursive=true&IncludeItemTypes=MusicAlbum&api_key=" + token;
+    } else if (searchMode == 3 && artist.equals("")) {
+      print(artist);
+      artist = songs.getJSONObject(currentIndex).getString("Name");
+      print(artist);
+      songUrl = serverUrl + "/Items?Recursive=true&IncludeItemTypes=MusicAlbum&artists=" + artist + "&api_key=" + token;
+    } else if (searchMode == 3) {
+      songUrl = serverUrl + "/Items?Recursive=true&IncludeItemTypes=MusicAlbum&artists=" + artist + "&api_key=" + token;
+    } else if (searchMode == 4) {
+      String album = songs.getJSONObject(currentIndex).getString("Name");
+      songUrl = serverUrl + "/Items?Recursive=true&IncludeItemTypes=Audio&albums=" + album + "&api_key=" + token;
+    }
     JSONObject library = loadJSONObject(songUrl);
     JSONArray items = library.getJSONArray("Items");
     songs = items;
@@ -539,7 +610,7 @@ void mousePress() {
   float centerY = height*0.8;
   d = dist(mouseX, mouseY, centerX, centerY);
   float outerRadius = (width*0.5)/2;
-  float innerRadius = (width*0.2)/2;
+  innerRadius = (width*0.2)/2;
   if (d <= outerRadius && d >= innerRadius) {
     alreadyPressed = true;
     float curAngle = atan2(mouseY-centerY, mouseX-centerX);
@@ -564,39 +635,29 @@ void mousePress() {
     }
 
     lastAngle = curAngle;
-  } else if (d <= innerRadius && !alreadyPressed && ((mp == null) || (songIndex != currentIndex))) {
-    println("FRESH START");
-    beenPressed = false;
-    JSONObject item = songs.getJSONObject(currentIndex);
-    String id = item.getString("Id");
-    currentId = id;
-    thread("playSong");
-    screen = 1;
-    alreadyPressed = true;
-    //heldFrames+=99999;
-  } else if (d <= innerRadius && !alreadyPressed && mp.isPlaying() && screen == 1) {
+  } else if (d <= innerRadius && !alreadyPressed && (mp != null && mp.isPlaying()) && screen == 1) {
     //heldFrames+=99999;
     beenPressed = false;
     mp.pause();
     alreadyPressed = true;
-  } else if (d <= innerRadius && !alreadyPressed && screen == 0 && songIndex == currentIndex) {
+  } else if (d <= innerRadius && !alreadyPressed  && (mp != null && mp.isPlaying()) && screen == 0 && songs.getJSONObject(currentIndex).getString("Name").equals(currentName)) {
     beenPressed = false;
     //heldFrames+=99999;
     screen = 1;
     alreadyPressed = true;
-  } else if (d <= innerRadius && !alreadyPressed && !mp.isPlaying() && currentIndex == songIndex) {
+  }/* else if (d <= innerRadius && !alreadyPressed && (mp != null && !mp.isPlaying()) && screen == 1) {
     beenPressed = false;
     //heldFrames+=99999;
     println("NOT THIS BITCH?");
     mp.start();
     alreadyPressed = true;
   }
-  
-  if (d <= innerRadius && heldFrames > frameRate &! shuffleChanged && screen == 1) {
+  */
+  if (d <= innerRadius && heldFrames < frameRate &! shuffleChanged && screen == 1) {
     beenPressed = false;
     shuffle = !shuffle;
     shuffleChanged = true;
-  }
+  } 
 }
 
 void playSong() {
@@ -604,6 +665,7 @@ void playSong() {
   songIndex = currentIndex;
   JSONObject item = songs.getJSONObject(currentIndex);
   String id = item.getString("Id");
+  currentName = item.getString("Name");
   String streamUrl = serverUrl + "/Audio/" + id + "/stream?static=true&api_key=" + token;
   try {
     if (mp != null) {
@@ -629,7 +691,7 @@ void playSong() {
           currentIndex++;
         } else {
           lastIndex = currentIndex;
-          currentIndex = int(random(songs.size()));        
+          currentIndex = int(random(songs.size()));
         }
         if (currentIndex >= songs.size()) {
           currentIndex = 0;
@@ -654,8 +716,10 @@ void playSong() {
 void loadPicture() {
   println("loading new picture");
   currentId = songs.getJSONObject(songIndex).getString("Id");
+  println("uno");
   String albumURL = serverUrl + "/Items/" + currentId + "/Images/Primary?fillHeight=300&fillWidth=300&quality=90";
   albumArt = loadImage(albumURL);
+  println("dos");
   JSONObject item = songs.getJSONObject(currentIndex);
   String name = item.getString("Name");
   String artist = item.isNull("AlbumArtist") ? "Unknown Artist" : item.getString("AlbumArtist");
